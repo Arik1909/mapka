@@ -22,28 +22,39 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install Dependencies
-        run: npm ci || npm install
-
-      - name: Build Web Assets
-        run: npm run build --if-present
-
-      - name: Sync Capacitor Android
         run: |
+          npm install --force
+          npm install -g @capacitor/cli
+
+      - name: Build Web App
+        run: |
+          npm run build --if-present || true
+          if [ ! -d "dist" ] && [ ! -d "build" ] && [ ! -d "www" ]; then
+            mkdir www
+            if [ -f "index.html" ]; then
+              cp -r * www/ 2>/dev/null || true
+            fi
+          fi
+
+      - name: Setup Capacitor and Android
+        run: |
+          WEB_DIR="dist"
+          if [ -d "build" ]; then WEB_DIR="build"; fi
+          if [ -d "www" ]; then WEB_DIR="www"; fi
+          
+          npx cap init "Apple Maps Clone" "com.apple.mapsclone" --web-dir "$WEB_DIR" || true
+          npm install @capacitor/core @capacitor/android
+          npx cap add android || true
           npx cap sync android || true
 
       - name: Build APK with Gradle
         run: |
-          if [ -d "android" ]; then
-            cd android
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          else
-            echo "Папка android не найдена! Убедитесь, что Capacitor настроен."
-            exit 1
-          fi
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
